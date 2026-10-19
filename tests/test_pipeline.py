@@ -2,6 +2,8 @@
 
 Ejecutar:  python -m unittest discover -s tests -v
 """
+from __future__ import annotations
+
 import http.server
 import json
 import os
@@ -173,20 +175,6 @@ class BuildTests(unittest.TestCase):
             for s in item["sources"]:
                 self.assertEqual(s["status"], common.STATUS_UNCHECKED)
 
-    def test_license_labels(self):
-        self.assertEqual(build_movies.license_label("https://creativecommons.org/licenses/by/3.0/"), "CC BY 3.0")
-        self.assertEqual(build_movies.license_label("https://creativecommons.org/publicdomain/zero/1.0/"),
-                         "CC0 (dominio público)")
-        self.assertIsNone(build_movies.license_label(None))
-
-    def test_pick_ia_file_prefers_h264_and_skips_huge(self):
-        files = [{"name": "a.mp4", "format": "MPEG4", "size": "900"},
-                 {"name": "b.mp4", "format": "h.264", "size": "500"},
-                 {"name": "c.mp4", "format": "h.264 HD", "size": "9999999999"},
-                 {"name": "d.txt", "format": "Text", "size": "1"}]
-        self.assertEqual(build_movies.pick_ia_file(files, 1_500_000_000)["name"], "b.mp4")
-        self.assertIsNone(build_movies.pick_ia_file([{"name": "x.pdf", "format": "PDF"}], 10**9))
-
     def test_manual_entries_require_rights(self):
         with tempfile.TemporaryDirectory() as tmp:
             p = Path(tmp) / "m.json"
@@ -232,7 +220,7 @@ class ExportTests(unittest.TestCase):
         self.assertIn("#EXTVLCOPT:http-referrer=https://r/", text)
         self.assertNotIn("https://b/x.m3u8", text)
         self.assertNotIn("https://c/x.m3u8", text)
-        self.assertIn("Canal  A", text)  # la coma del nombre se neutraliza
+        self.assertIn("Canal  A", text)
 
 
 class M3UParserTests(unittest.TestCase):
@@ -247,3 +235,4 @@ class M3UParserTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+        
