@@ -1,4 +1,4 @@
-name: Actualizar Canales y Listas IPTV
+name: Actualizar catálogo y publicar
 
 on:
   schedule:
@@ -8,6 +8,11 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pages: write
+      id-token: write
+
     steps:
       - name: Checkout repositorio
         uses: actions/checkout@v4
@@ -17,10 +22,20 @@ jobs:
         with:
           python-version: '3.10'
 
-      - name: Ejecutar verificación y compilación
+      - name: Descomprimir e instalar proyecto desde el ZIP
+        run: |
+          if [ -f "mi-plataforma.zip" ]; then
+            echo "Descomprimiendo mi-plataforma.zip..."
+            unzip -o mi-plataforma.zip
+          fi
+
+      - name: Instalar dependencias
         run: |
           python -m pip install --upgrade pip
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+
+      - name: Ejecutar verificación y compilación
+        run: |
           python tools/build_live.py || true
           python tools/build_movies.py || true
 
@@ -28,7 +43,7 @@ jobs:
         run: |
           git config --global user.name "Robot IPTV"
           git config --global user.email "robot@actions.github.com"
-          git add public/data/
+          git add .
           git commit -m "Actualización automática de listas y catálogos" || echo "No hay cambios para guardar"
           git push || echo "Sin cambios en el repositorio"
           
