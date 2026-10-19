@@ -1,0 +1,53 @@
+[
+  {
+    "channel": "PruebaNoticiasAR.ar",
+    "url": "https://ejemplo.invalid/noticias/index.m3u8",
+    "quality": "720p",
+    "referrer": null,
+    "user_agent": null
+  },
+  {
+    "channel": "PruebaDeportesAR.ar",
+    "url": "http://ejemplo.invalid/deportes/index.m3u8",
+    "quality": "480p",
+    "referrer": null,
+    "user_agent": null
+  },
+  {
+    "channel": "PruebaCulturaAR.ar",
+    "url": "https://ejemplo.invalid/cultura/index.m3u8",
+    "quality": "1080p",
+    "referrer": "https://ejemplo.invalid/",
+    "user_agent": null
+  },
+  {
+    "channel": "PruebaInfantilUY.uy",
+    "url": "https://ejemplo.invalid/infantil/index.m3u8",
+    "quality": "576p",
+    "referrer": null,
+    "user_agent": null
+  },
+  {
+    "channel": "PruebaMusicaMX.mx",
+    "url": "https://ejemplo.invalid/musica/index.m3u8",
+    "quality": null,
+    "referrer": null,
+    "user_agent": null
+  },
+  {
+    "channel": "PruebaAdultos.ar",
+    "url": "https://ejemplo.invalid/adultos/index.m3u8"
+  },
+  {
+    "channel": "PruebaCerrado.ar",
+    "url": "https://ejemplo.invalid/cerrado/index.m3u8"
+  },
+  {
+    "channel": "PruebaBloqueado.ar",
+    "url": "https://ejemplo.invalid/bloqueado/index.m3u8"
+  },
+  {
+    "channel": "PruebaJapon.jp",
+    "url": "https://ejemplo.invalid/japon/index.m3u8"
+  }
+]

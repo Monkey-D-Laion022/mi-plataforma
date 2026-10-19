@@ -1,35 +1,78 @@
-<!DOCTYPE html>
-<html lang="es">
+<!doctype html>
+<html lang="es-AR">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mi Plataforma IPTV</title>
-    <link rel="stylesheet" href="styles.css">
-    <link rel="manifest" href="manifest.webmanifest">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#16212b">
+<title>Mi Plataforma</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="stylesheet" href="styles.css">
 </head>
 <body>
-    <header>
-        <h1>Mi Plataforma</h1>
-        <nav>
-            <button class="tab-btn active" data-tab="live">LIVE</button>
-            <button class="tab-btn" data-tab="movies">MOVIES</button>
-            <button class="tab-btn" data-tab="series">SERIES</button>
-        </nav>
-    </header>
-    <main>
-        <section id="live" class="tab-content active">
-            <h2>Canales en Vivo</h2>
-            <div id="live-list" class="grid">Cargando canales...</div>
-        </section>
-        <section id="movies" class="tab-content">
-            <h2>Películas</h2>
-            <div id="movies-list" class="grid">Cargando películas...</div>
-        </section>
-        <section id="series" class="tab-content">
-            <h2>Series</h2>
-            <div id="series-list" class="grid">No hay fuentes automatizables de series gratuitas disponibles.</div>
-        </section>
-    </main>
-    <script src="app.js"></script>
+<header class="top">
+  <h1>Mi Plataforma</h1>
+  <button id="btn-settings" class="icon-btn" aria-label="Ajustes y Acerca de">Ajustes</button>
+</header>
+
+<div id="banner" class="banner" hidden></div>
+
+<nav class="tabs" role="tablist" aria-label="Secciones">
+  <button role="tab" id="tab-live" aria-selected="true" data-tab="live">Live</button>
+  <button role="tab" id="tab-movies" aria-selected="false" data-tab="movies">Movies</button>
+  <button role="tab" id="tab-series" aria-selected="false" data-tab="series">Series</button>
+</nav>
+
+<p id="tab-note" class="note" hidden></p>
+<section class="filters" id="filters" aria-label="Filtros"></section>
+
+<main id="list" class="list" aria-live="polite"></main>
+<div class="more-wrap"><button id="btn-more" class="btn" hidden>Mostrar más</button></div>
+
+<!-- Reproductor -->
+<dialog id="player" aria-label="Reproductor">
+  <div class="player-head">
+    <strong id="player-title"></strong>
+    <button id="player-close" class="icon-btn" aria-label="Cerrar">Cerrar</button>
+  </div>
+  <video id="video" controls playsinline></video>
+  <p id="player-msg" class="player-msg"></p>
+  <div class="player-actions" id="player-actions"></div>
+</dialog>
+
+<!-- Detalle de serie / película -->
+<dialog id="detail" aria-label="Detalle">
+  <div class="player-head">
+    <strong id="detail-title"></strong>
+    <button id="detail-close" class="icon-btn" aria-label="Cerrar">Cerrar</button>
+  </div>
+  <div id="detail-body"></div>
+</dialog>
+
+<!-- Ajustes -->
+<dialog id="settings" aria-label="Ajustes">
+  <div class="player-head">
+    <strong>Ajustes y Acerca de</strong>
+    <button id="settings-close" class="icon-btn" aria-label="Cerrar">Cerrar</button>
+  </div>
+  <div class="settings-body">
+    <h2>Clave de TMDB (opcional)</h2>
+    <p>Con tu propia clave gratuita de TMDB, la app busca carátulas y sinopsis en español para las películas que no las tengan. La clave se guarda solo en este teléfono.</p>
+    <label for="tmdb-key">Clave API v3 de TMDB</label>
+    <input id="tmdb-key" type="password" autocomplete="off" inputmode="text" placeholder="Pegá tu clave">
+    <div class="row">
+      <button id="tmdb-save" class="btn">Guardar</button>
+      <button id="tmdb-clear" class="btn ghost">Borrar clave y caché</button>
+    </div>
+    <h2>Datos</h2>
+    <p id="about-data"></p>
+    <h2>Acerca de</h2>
+    <p>Esta app no aloja ni retransmite video. Lista enlaces públicos y muestra su estado de verificación. Los canales provienen de la API pública de iptv-org; las películas, de ítems con licencia declarada en Internet Archive o Wikimedia Commons.</p>
+    <p class="tmdb-note">This product uses the TMDB API but is not endorsed or certified by TMDB.</p>
+    <p class="muted">Pendiente para publicar: agregá el logo oficial de TMDB desde su página de logos y atribución, en esta sección (lo exigen sus condiciones).</p>
+  </div>
+</dialog>
+
+<script src="app.js" defer></script>
 </body>
 </html>

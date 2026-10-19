@@ -1,0 +1,23 @@
+[
+  {
+    "title": "Cine.ar Play (INCAA): series argentinas",
+    "year": null,
+    "languages": [
+      "es"
+    ],
+    "genres": [
+      "plataforma oficial"
+    ],
+    "overview": "El catálogo de CINE.AR Play incluye series nacionales, según el INCAA. No hay forma automática y autorizada de listarlas dentro de esta app, así que se abre el sitio oficial.",
+    "rights": "Plataforma oficial del INCAA. Enlace externo.",
+    "license": "Sitio oficial (enlace externo)",
+    "origin": "Plataforma oficial",
+    "origin_url": "http://www.cine.ar/",
+    "sources": [
+      {
+        "url": "http://www.cine.ar/",
+        "type": "external"
+      }
+    ]
+  }
+]

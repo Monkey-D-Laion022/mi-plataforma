@@ -1,0 +1,60 @@
+[
+  {
+    "id": "prueba-serie-1",
+    "kind": "series",
+    "title": "Serie de Prueba",
+    "year": 1950,
+    "languages": [
+      "es"
+    ],
+    "genres": [
+      "comedia"
+    ],
+    "overview": "Dato de prueba para comprobar temporadas y episodios.",
+    "poster": null,
+    "license": "Dato de prueba",
+    "origin": "Fixture",
+    "seasons": [
+      {
+        "number": 1,
+        "episodes": [
+          {
+            "number": 1,
+            "title": "Episodio uno",
+            "sources": [
+              {
+                "url": "https://ejemplo.invalid/s1e1.mp4",
+                "type": "mp4"
+              }
+            ]
+          },
+          {
+            "number": 2,
+            "title": "Episodio dos",
+            "sources": [
+              {
+                "url": "https://ejemplo.invalid/s1e2.mp4",
+                "type": "mp4"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "number": 2,
+        "episodes": [
+          {
+            "number": 1,
+            "title": "Regreso",
+            "sources": [
+              {
+                "url": "https://ejemplo.invalid/s2e1.mp4",
+                "type": "mp4"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+]

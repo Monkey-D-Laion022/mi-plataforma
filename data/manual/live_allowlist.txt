@@ -1,0 +1,5 @@
+# Lista blanca de canales (opcional).
+# Si agregás IDs acá (uno por línea, tal como figuran en iptv-org, por ejemplo: Canal7.ar),
+# la app mostrará SOLO esos canales. Es el modo más conservador respecto de derechos:
+# elegís vos qué emisoras considerás oficiales o de emisión abierta.
+# Vacío = se incluyen todos los canales públicos de la API excepto los de la blocklist de iptv-org.

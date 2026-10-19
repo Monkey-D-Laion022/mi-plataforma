@@ -1,0 +1,1 @@
+Las listas live-ar.m3u y live-latam.m3u se generan solas en la primera ejecucion del workflow, solo con canales verificados. No hay listas reales en este ZIP porque no pude acceder a Internet.

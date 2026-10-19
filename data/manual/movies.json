@@ -1,0 +1,144 @@
+[
+  {
+    "title": "Big Buck Bunny",
+    "year": 2008,
+    "languages": [
+      "en"
+    ],
+    "genres": [
+      "animación",
+      "cortometraje"
+    ],
+    "overview": "Un conejo gigante y apacible se venga de tres roedores que lo hostigan. Película abierta de la Blender Foundation (proyecto Peach); casi sin diálogos.",
+    "poster": "https://archive.org/services/img/BigBuckBunny",
+    "rights": "Creative Commons Atribución 3.0. Licencia declarada por la Blender Foundation para el proyecto Peach (peach.blender.org); el archivo está en un ítem de Internet Archive que reproduce esa licencia.",
+    "license": "CC BY 3.0",
+    "license_url": "https://creativecommons.org/licenses/by/3.0/",
+    "origin": "Internet Archive (Blender Foundation Films)",
+    "origin_url": "https://archive.org/details/Sintel_201709",
+    "popularity": 1000,
+    "sources": [
+      {
+        "url": "https://archive.org/download/Sintel_201709/Big%20Buck%20Bunny.mp4",
+        "type": "mp4"
+      }
+    ]
+  },
+  {
+    "title": "Sintel",
+    "year": 2010,
+    "languages": [
+      "en"
+    ],
+    "genres": [
+      "animación",
+      "fantasía",
+      "cortometraje"
+    ],
+    "overview": "Una joven busca a su amigo, un dragón llamado Scales. Película abierta de la Blender Foundation (proyecto Durian).",
+    "rights": "Creative Commons Atribución, según la Blender Foundation (proyecto Durian). La versión exacta de la licencia (3.0) figura en listados secundarios; confirmala en durian.blender.org.",
+    "license": "CC BY 3.0 (a confirmar)",
+    "license_url": "https://creativecommons.org/licenses/by/3.0/",
+    "origin": "Internet Archive (Blender Foundation Films)",
+    "origin_url": "https://archive.org/details/Sintel_201709",
+    "popularity": 900,
+    "sources": [
+      {
+        "url": "https://archive.org/download/Sintel_201709/Sintel.mp4",
+        "type": "mp4"
+      }
+    ]
+  },
+  {
+    "title": "Tears of Steel",
+    "year": 2012,
+    "languages": [
+      "en"
+    ],
+    "genres": [
+      "ciencia ficción",
+      "cortometraje"
+    ],
+    "overview": "Un grupo de guerreros y científicos se reúne en Ámsterdam para intentar salvar el mundo de unos robots destructivos. Película abierta de la Blender Foundation (proyecto Mango).",
+    "rights": "Creative Commons Atribución 3.0, declarada en el sitio oficial mango.blender.org.",
+    "license": "CC BY 3.0",
+    "license_url": "https://creativecommons.org/licenses/by/3.0/",
+    "origin": "Internet Archive (Blender Foundation Films)",
+    "origin_url": "https://archive.org/details/Sintel_201709",
+    "popularity": 800,
+    "sources": [
+      {
+        "url": "https://archive.org/download/Sintel_201709/Tears%20of%20Steel.mp4",
+        "type": "mp4"
+      }
+    ]
+  },
+  {
+    "title": "Elephants Dream",
+    "year": 2006,
+    "languages": [
+      "en"
+    ],
+    "genres": [
+      "animación",
+      "cortometraje"
+    ],
+    "overview": "Primera película abierta de la Blender Foundation (proyecto Orange).",
+    "rights": "Creative Commons Atribución 2.5 según la lista de películas de código abierto de Wikipedia (fuente secundaria); el sitio oficial es orange.blender.org. Confirmalo antes de redistribuir.",
+    "license": "CC BY 2.5 (a confirmar)",
+    "license_url": "https://creativecommons.org/licenses/by/2.5/",
+    "origin": "Internet Archive (Blender Foundation Films)",
+    "origin_url": "https://archive.org/details/Sintel_201709",
+    "popularity": 700,
+    "sources": [
+      {
+        "url": "https://archive.org/download/Sintel_201709/Elephants%20Dream.ogv",
+        "type": "ogv"
+      }
+    ]
+  },
+  {
+    "title": "Cine.ar Play (INCAA): cine argentino gratis",
+    "year": null,
+    "languages": [
+      "es"
+    ],
+    "genres": [
+      "plataforma oficial"
+    ],
+    "overview": "Plataforma oficial y gratuita del INCAA con películas, cortos y series argentinas. Requiere registro gratuito, según notas de prensa. Se abre en su sitio: no se reproduce dentro de esta app.",
+    "rights": "Plataforma oficial del INCAA. Enlace externo: el contenido lo sirve y lo licencia el propio INCAA.",
+    "license": "Sitio oficial (enlace externo)",
+    "origin": "Plataforma oficial",
+    "origin_url": "http://www.cine.ar/",
+    "popularity": 2000,
+    "sources": [
+      {
+        "url": "http://www.cine.ar/",
+        "type": "external"
+      }
+    ]
+  },
+  {
+    "title": "Retina Latina: cine latinoamericano gratis",
+    "year": null,
+    "languages": [
+      "es"
+    ],
+    "genres": [
+      "plataforma oficial"
+    ],
+    "overview": "Plataforma pública de cine latinoamericano, gratuita para ciudadanos de la región (según su presentación). Se abre en su sitio.",
+    "rights": "Plataforma pública coordinada por institutos de cine de la región. Enlace externo: el contenido lo sirve y lo licencia la propia plataforma.",
+    "license": "Sitio oficial (enlace externo)",
+    "origin": "Plataforma oficial",
+    "origin_url": "https://www.retinalatina.org",
+    "popularity": 1900,
+    "sources": [
+      {
+        "url": "https://www.retinalatina.org",
+        "type": "external"
+      }
+    ]
+  }
+]

@@ -1,0 +1,139 @@
+[
+  {
+    "id": "PruebaNoticiasAR.ar",
+    "name": "Prueba Noticias AR",
+    "country": "AR",
+    "categories": [
+      "news"
+    ],
+    "languages": [
+      "spa"
+    ],
+    "is_nsfw": false,
+    "logo": null,
+    "website": null,
+    "closed": null
+  },
+  {
+    "id": "PruebaDeportesAR.ar",
+    "name": "Prueba Deportes AR",
+    "country": "AR",
+    "categories": [
+      "sports"
+    ],
+    "languages": [
+      "spa"
+    ],
+    "is_nsfw": false,
+    "logo": null,
+    "closed": null
+  },
+  {
+    "id": "PruebaCulturaAR.ar",
+    "name": "Prueba Cultura AR",
+    "country": "AR",
+    "categories": [
+      "culture",
+      "education"
+    ],
+    "languages": [
+      "spa"
+    ],
+    "is_nsfw": false,
+    "logo": null,
+    "closed": null
+  },
+  {
+    "id": "PruebaInfantilUY.uy",
+    "name": "Prueba Infantil UY",
+    "country": "UY",
+    "categories": [
+      "kids"
+    ],
+    "languages": [
+      "spa"
+    ],
+    "is_nsfw": false,
+    "logo": null,
+    "closed": null
+  },
+  {
+    "id": "PruebaMusicaMX.mx",
+    "name": "Prueba Música MX",
+    "country": "MX",
+    "categories": [
+      "music"
+    ],
+    "languages": [
+      "spa"
+    ],
+    "is_nsfw": false,
+    "logo": null,
+    "closed": null
+  },
+  {
+    "id": "PruebaAdultos.ar",
+    "name": "Prueba Adultos (debe excluirse)",
+    "country": "AR",
+    "categories": [
+      "xxx"
+    ],
+    "languages": [
+      "spa"
+    ],
+    "is_nsfw": true,
+    "closed": null
+  },
+  {
+    "id": "PruebaCerrado.ar",
+    "name": "Prueba Cerrado (debe excluirse)",
+    "country": "AR",
+    "categories": [
+      "general"
+    ],
+    "languages": [
+      "spa"
+    ],
+    "is_nsfw": false,
+    "closed": "2020-05-31"
+  },
+  {
+    "id": "PruebaBloqueado.ar",
+    "name": "Prueba Bloqueado DMCA (debe excluirse)",
+    "country": "AR",
+    "categories": [
+      "general"
+    ],
+    "languages": [
+      "spa"
+    ],
+    "is_nsfw": false,
+    "closed": null
+  },
+  {
+    "id": "PruebaJapon.jp",
+    "name": "Prueba Japón (fuera de LatAm)",
+    "country": "JP",
+    "categories": [
+      "general"
+    ],
+    "languages": [
+      "jpn"
+    ],
+    "is_nsfw": false,
+    "closed": null
+  },
+  {
+    "id": "PruebaSinFuente.ar",
+    "name": "Prueba Sin Fuente (debe excluirse)",
+    "country": "AR",
+    "categories": [
+      "general"
+    ],
+    "languages": [
+      "spa"
+    ],
+    "is_nsfw": false,
+    "closed": null
+  }
+]

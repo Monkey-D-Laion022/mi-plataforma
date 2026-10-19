@@ -1,0 +1,20 @@
+{
+  "ia_queries": [
+    {
+      "name": "Español con licencia abierta",
+      "q": "mediatype:movies AND language:(Spanish OR spa OR es) AND licenseurl:*creativecommons.org*",
+      "rows": 100,
+      "max_items": 150
+    },
+    {
+      "name": "Dominio público declarado (CC0 / Public Domain Mark)",
+      "q": "mediatype:movies AND licenseurl:*creativecommons.org/publicdomain*",
+      "rows": 100,
+      "max_items": 150
+    }
+  ],
+  "commons_categories": [],
+  "allow_unlicensed": false,
+  "max_file_bytes": 1500000000,
+  "_nota": "Consultas sin probar contra la API real. Ajustalas si devuelven 0 resultados. commons_categories: agregá categorías como \"Category:NOMBRE\" (sin probar)."
+}
