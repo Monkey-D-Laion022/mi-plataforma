@@ -1,49 +1,117 @@
 name: Actualizar catálogo y publicar
 
+# Este MISMO archivo hace dos cosas:
+#  1) La primera vez, si encuentra un .zip en la raíz del repositorio, lo descomprime e instala el proyecto.
+#  2) Siempre: actualiza los catálogos, verifica los enlaces, genera las listas y publica la app en GitHub Pages.
+
 on:
   schedule:
-    - cron: '0 4 * * *'
-  workflow_dispatch:
+    - cron: "0 7 * * 1"      # todos los lunes, 07:00 UTC
+  workflow_dispatch:          # botón "Run workflow" (se puede tocar desde Chrome en el celular)
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      pages: write
-      id-token: write
-
+    timeout-minutes: 90
     steps:
-      - name: Checkout repositorio
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Configurar Python
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          python-version: "3.12"
 
-      - name: Descomprimir e instalar proyecto desde el ZIP
+      - name: Instalar el proyecto desde el ZIP (solo la primera vez)
         run: |
-          if [ -f "mi-plataforma.zip" ]; then
-            echo "Descomprimiendo mi-plataforma.zip..."
-            unzip -o mi-plataforma.zip
+          shopt -s nullglob
+          zips=(*.zip)
+          if [ ${#zips[@]} -eq 0 ]; then
+            echo "No hay ZIP en la raíz: se usa el contenido que ya está en el repositorio."
+            exit 0
           fi
+          echo "Instalando desde ${zips[0]}"
+          rm -rf _unz
+          python -m zipfile -e "${zips[0]}" _unz
+          tools_dir="$(find _unz -type d -name tools -print -quit)"
+          if [ -z "$tools_dir" ]; then
+            echo "::error::El ZIP no contiene la carpeta tools/. Subiste el ZIP equivocado?"
+            exit 1
+          fi
+          src="$(dirname "$tools_dir")"
+          # Los workflows no los puede escribir el robot (limitación de GitHub). El tuyo ya está pegado a mano.
+          rm -rf "$src/.github"
+          cp -a "$src"/. .
+          rm -rf _unz "${zips[0]}"
+          git config user.name "catalog-bot"
+          git config user.email "catalog-bot@users.noreply.github.com"
+          git add -A
+          git commit -m "Instalar proyecto desde el ZIP" || true
+          git push
 
-      - name: Instalar dependencias
+      - name: Limpiar datos de prueba antes de construir
         run: |
-          python -m pip install --upgrade pip
-          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          rm -rf public/data public/lists public/stremio
+          mkdir -p public/data public/lists
 
-      - name: Ejecutar verificación y compilación
-        run: |
-          python tools/build_live.py || true
-          python tools/build_movies.py || true
+      - name: Pruebas automáticas (sin internet)
+        run: python -m unittest discover -s tests
 
-      - name: Guardar cambios automáticos
+      - name: Canales en vivo (iptv-org)
+        run: python tools/build_live.py
+
+      - name: Películas y series (si falla, el resto sigue)
+        continue-on-error: true
+        run: python tools/build_movies.py
+
+      - name: Verificar enlaces (un enlace roto nunca frena el resto)
+        run: python tools/verify.py public/data/live.json public/data/movies.json public/data/series.json
+
+      - name: Guardia de calidad del catálogo
+        run: python tools/guard.py catalogs --strict
+
+      - name: Exportar listas M3U y add-on de Stremio
         run: |
-          git config --global user.name "Robot IPTV"
-          git config --global user.email "robot@actions.github.com"
-          git add .
-          git commit -m "Actualización automática de listas y catálogos" || echo "No hay cambios para guardar"
-          git push || echo "Sin cambios en el repositorio"
-          
+          python tools/export_m3u.py
+          python tools/build_stremio.py
+
+      - name: Guardia de calidad de las listas M3U
+        run: python tools/guard.py lists
+
+      - name: Resumen de la corrida
+        if: always()
+        run: |
+          echo '### Informe de la actualización' >> "$GITHUB_STEP_SUMMARY"
+          echo '```json' >> "$GITHUB_STEP_SUMMARY"
+          cat public/data/report.json >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || echo '{"error": "sin informe"}' >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Guardar historial de verificación
+        run: |
+          git config user.name "catalog-bot"
+          git config user.email "catalog-bot@users.noreply.github.com"
+          git add data/state.json
+          git diff --cached --quiet || (git commit -m "Actualizar historial de verificación" && git push)
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: public
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
