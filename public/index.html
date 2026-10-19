@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mi Plataforma IPTV</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="manifest" href="manifest.webmanifest">
+</head>
+<body>
+    <header>
+        <h1>Mi Plataforma</h1>
+        <nav>
+            <button class="tab-btn active" data-tab="live">LIVE</button>
+            <button class="tab-btn" data-tab="movies">MOVIES</button>
+            <button class="tab-btn" data-tab="series">SERIES</button>
+        </nav>
+    </header>
+    <main>
+        <section id="live" class="tab-content active">
+            <h2>Canales en Vivo</h2>
+            <div id="live-list" class="grid">Cargando canales...</div>
+        </section>
+        <section id="movies" class="tab-content">
+            <h2>Películas</h2>
+            <div id="movies-list" class="grid">Cargando películas...</div>
+        </section>
+        <section id="series" class="tab-content">
+            <h2>Series</h2>
+            <div id="series-list" class="grid">No hay fuentes automatizables de series gratuitas disponibles.</div>
+        </section>
+    </main>
+    <script src="app.js"></script>
+</body>
+</html>
