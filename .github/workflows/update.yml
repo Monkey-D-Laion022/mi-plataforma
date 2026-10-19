@@ -57,10 +57,12 @@ jobs:
       - name: Resumen de la corrida
         if: always()
         run: |
-          echo '### Informe de la actualización' >> "$GITHUB_STEP_SUMMARY"
-          echo '```json' >> "$GITHUB_STEP_SUMMARY"
-          cat public/data/report.json >> "$GITHUB_STEP_SUMMARY" 2>/dev/null \vert{}\vert{} echo '{"error": "sin informe"}' >> "$GITHUB_STEP_SUMMARY"
-          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          {
+            echo '### Informe de la actualización'
+            echo '```json'
+            if [ -f public/data/report.json ]; then cat public/data/report.json; else echo '{"aviso": "No se generó report.json: la corrida se cortó antes de la guardia."}'; fi
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Guardar historial de verificación
         run: |
