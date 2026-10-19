@@ -1,4 +1,4 @@
-Name: Actualizar catálogo y publicar
+name: Actualizar catálogo y publicar
 
 on:
   schedule:
