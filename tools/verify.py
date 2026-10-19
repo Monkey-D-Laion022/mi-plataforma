@@ -154,7 +154,7 @@ def verify_catalog(path: Path, state: dict, workers: int = 32, timeout: float = 
 
     counts: dict[str, int] = {}
     for (item, src), res in zip(todo, results):
-        key = src["url"]
+        key = src.get("url") or ""
         hist = state.setdefault(key, {"fails": 0, "last_ok": None})
         src.update(res)
         if res["status"] == STATUS_OK:
@@ -189,3 +189,4 @@ def main(argv: list[str]) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main(sys.argv[1:]))
+    
