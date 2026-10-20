@@ -2,7 +2,7 @@
 
 Uso en el workflow (después de verificar y después de exportar las M3U):
     python tools/guard.py catalogs --strict      # falla si el resultado es sospechoso
-    python tools/guard.py lists                  # falla si las M3U no coinciden con los canales "ok"
+    python tools/guard.py lists                  # falla si las M3U (live y VOD) no coinciden con lo "ok" del catálogo
 
 Qué hace falta para que FALLE (y por lo tanto NO se publique; el sitio anterior sigue en línea):
   * live.json vacío o sin canales de Argentina  -> la API cambió o no respondió.
@@ -21,6 +21,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 from common import STATUS_EXTERNAL, STATUS_FIXTURE, STATUS_OK, load_json, now_iso, save_json  # noqa: E402
+from export_m3u import vod_entries  # noqa: E402
 from verify import iter_sources  # noqa: E402
 
 DATA = Path("public/data")
@@ -55,23 +56,20 @@ def check_catalogs(strict: bool) -> tuple[dict, list[str], list[str]]:
         "live": summarize(live), "movies": summarize(movies), "series": summarize(series)}}
 
     items = live.get("items", [])
-    from_iptv_org = str(live.get("origin", "")).startswith("iptv-org")
     ar_items = [c for c in items if c.get("country") == "AR"]
     if not items:
         failures.append("live.json no tiene canales: la API de iptv-org no respondió o cambió de formato.")
-    elif from_iptv_org and not ar_items:
+    elif not ar_items:
         failures.append("live.json no tiene canales de Argentina (¿cambió el formato de la API?).")
 
     for name, cat in (("live", live), ("movies", movies), ("series", series)):
         s = report["catalogs"][name]
         real = [st for st in s["by_status"] if st not in (STATUS_FIXTURE, STATUS_EXTERNAL)]
         checked = sum(s["by_status"][st] for st in real if st != "unchecked")
-        # Solo LIVE puede frenar la publicación; en el resto, estos problemas son advertencias.
-        problems = failures if name == "live" else warnings
         if strict and (str(cat.get("origin", "")).startswith("DATOS DE PRUEBA") or s["by_status"].get(STATUS_FIXTURE)):
             failures.append(f"{name}: contiene datos de prueba en una corrida real.")
         if checked >= 10 and s["network_errors"] / max(checked, 1) > 0.9:
-            problems.append(f"{name}: {s['network_errors']} de {checked} fuentes sin respuesta de red. "
+            failures.append(f"{name}: {s['network_errors']} de {checked} fuentes sin respuesta de red. "
                             "Es casi seguro un fallo de red del servidor, no de los canales.")
         if name == "live" and checked >= 20 and s["by_status"].get(STATUS_OK, 0) == 0:
             failures.append("live: ninguna de las fuentes verificadas dio 'ok'. Revisá el verificador.")
@@ -110,9 +108,25 @@ def check_lists() -> list[str]:
         print(f"[guard] {fname}: {got} canales en el archivo, {exp} esperados")
         if got != exp:
             problems.append(f"{fname} tiene {got} canales pero el catálogo dice {exp} (error del proceso de exportación).")
+    # Listas VOD: lo esperado se calcula con la MISMA función que usa el exportador.
+    movies = (load_json(DATA / "movies.json", {}) or {}).get("items", [])
+    series = (load_json(DATA / "series.json", {}) or {}).get("items", [])
+    entries = vod_entries(movies, series)
+    n_movies = sum(1 for e in entries if e["kind"] == "movie")
+    n_series = len(entries) - n_movies
+    for fname, exp in (("movies.m3u", n_movies), ("series.m3u", n_series), ("vod.m3u", len(entries))):
+        got = count_m3u(Path("public/lists") / fname)
+        if got == -1 and exp == 0:
+            got = 0  # sin contenido que exportar, un archivo ausente no es un error
+        print(f"[guard] {fname}: {got} entradas en el archivo, {exp} esperadas")
+        if got != exp:
+            problems.append(f"{fname} tiene {got} entradas pero el catálogo dice {exp} (error del proceso de exportación).")
     report = load_json(REPORT, {}) or {}
     report["lists"] = {"live_ar_m3u": count_m3u(Path("public/lists/live-ar.m3u")),
-                       "live_latam_m3u": count_m3u(Path("public/lists/live-latam.m3u"))}
+                       "live_latam_m3u": count_m3u(Path("public/lists/live-latam.m3u")),
+                       "movies_m3u": count_m3u(Path("public/lists/movies.m3u")),
+                       "series_m3u": count_m3u(Path("public/lists/series.m3u")),
+                       "vod_m3u": count_m3u(Path("public/lists/vod.m3u"))}
     save_json(REPORT, report, indent=2)
     return problems
 
@@ -137,5 +151,5 @@ def main(argv: list[str]) -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main(sys.argv[1:]))
+    raise SystemExit(sys.argv[1:])
     
