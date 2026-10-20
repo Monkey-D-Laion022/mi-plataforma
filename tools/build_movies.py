@@ -1,150 +1,440 @@
+"""Construye public/data/movies.json y public/data/series.json.
+
+Fuentes:
+  0. Listas M3U propias declaradas en config.json -> "m3u_lists" (cada una con su campo "rights")
+Fuentes públicas (todas con API sin clave):
+  1. Internet Archive: https://archive.org/advancedsearch.php  +  https://archive.org/metadata/<id>
+     (documentadas en https://archive.org/help/aboutsearch.htm)
+  2. Wikimedia Commons: https://commons.wikimedia.org/w/api.php (MediaWiki Action API)
+  3. Entradas manuales en data/manual/*.json (vos garantizás el derecho a reproducirlas)
+
+REGLA DE DERECHOS: Internet Archive declara que NO garantiza el estado de copyright de sus
+ítems. Por eso, por defecto solo se incluye un ítem de Internet Archive si tiene un campo
+`licenseurl` (Creative Commons / dominio público). `allow_unlicensed` en config.json existe,
+pero viene en false y no se recomienda activarlo.
+
+Las consultas de config.json NO fueron probadas contra la API real en el entorno donde se
+escribió este código (sin red). La primera ejecución en GitHub Actions es la prueba real.
+
+Uso:
+    python tools/build_movies.py
+    python tools/build_movies.py --fixtures data/fixtures      # datos de prueba, sin red
+"""
 from __future__ import annotations
 
 import argparse
-import json
 import re
 import sys
-import urllib.request
 from pathlib import Path
+from urllib.parse import quote, urlencode
 
 sys.path.insert(0, str(Path(__file__).parent))
-from common import STATUS_UNCHECKED, now_iso, save_json, slugify
+from common import (STATUS_EXTERNAL, STATUS_FIXTURE, STATUS_UNCHECKED, get_json, http_get,  # noqa: E402
+                    load_json, now_iso, parse_m3u, save_json, slugify)
 
-# Tus 5 listas M3U
-LISTAS_M3U = [
-    "http://xdplus.site:2082/get.php?username=EstebanQP&password=ZVXNF&type=m3u_plus",
-    "http://aurinegro.site:8080/get.php?username=RICARDOTORREZ&password=5MZg5DjYd9&type=m3u_plus",
-    "http://bunkertp.xyz:8000/get.php?username=gubazu4&password=210727&type=m3u_plus",
-    "http://bunkertp.xyz:8000/get.php?username=afsantiagol&password=lopez&type=m3u_plus",
-    "http://myultratv.com:8080/get.php?username=956124877tv&password=s08e13&type=m3u_plus",
+IA_SEARCH = "https://archive.org/advancedsearch.php"
+IA_META = "https://archive.org/metadata/"
+COMMONS_API = "https://commons.wikimedia.org/w/api.php"
+
+DEFAULT_CONFIG = {
+    "ia_queries": [
+        {
+            "name": "Español con licencia abierta",
+            "q": 'mediatype:movies AND language:(Spanish OR spa OR es) AND licenseurl:*creativecommons.org*',
+            "rows": 100,
+            "max_items": 150,
+        },
+        {
+            "name": "Dominio público declarado (CC0 / Public Domain Mark)",
+            "q": "mediatype:movies AND licenseurl:*creativecommons.org/publicdomain*",
+            "rows": 100,
+            "max_items": 150,
+        },
+    ],
+    "commons_categories": [],
+    "m3u_lists": [],   # [{"name": "...", "url": "https://...", "rights": "de dónde sale tu derecho", "max_items": 5000}]
+    "allow_unlicensed": False,
+    "max_file_bytes": 1_500_000_000,
+}
+
+LICENSE_LABELS = [
+    (re.compile(r"publicdomain/zero"), "CC0 (dominio público)"),
+    (re.compile(r"publicdomain/mark"), "Dominio público (marca PDM)"),
+    (re.compile(r"licenses/by-nc-nd/([\d.]+)"), "CC BY-NC-ND {0}"),
+    (re.compile(r"licenses/by-nc-sa/([\d.]+)"), "CC BY-NC-SA {0}"),
+    (re.compile(r"licenses/by-nc/([\d.]+)"), "CC BY-NC {0}"),
+    (re.compile(r"licenses/by-nd/([\d.]+)"), "CC BY-ND {0}"),
+    (re.compile(r"licenses/by-sa/([\d.]+)"), "CC BY-SA {0}"),
+    (re.compile(r"licenses/by/([\d.]+)"), "CC BY {0}"),
 ]
 
+# Preferencia de archivos en Internet Archive (formato -> prioridad; menor = mejor para celular)
+IA_FORMAT_PRIORITY = {"h.264": 0, "MPEG4": 1, "h.264 HD": 2, "512Kb MPEG4": 3, "Ogg Video": 5, "WebM": 6}
 
-def descargar_y_parsear_m3u(urls: list[str]) -> list[dict]:
-    elementos = []
-    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
 
-    for url in urls:
-        print(f"[m3u] Descargando e ingresando lista: {url[:45]}...")
+def license_label(url: str | None) -> str | None:
+    if not url:
+        return None
+    for pattern, label in LICENSE_LABELS:
+        m = pattern.search(url)
+        if m:
+            return label.format(*m.groups())
+    return "Licencia indicada (revisar enlace)"
+
+
+def as_list(value) -> list:
+    if value is None:
+        return []
+    return value if isinstance(value, list) else [value]
+
+
+def norm_language(values) -> list[str]:
+    out = []
+    for v in as_list(values):
+        v = str(v).strip().lower()
+        if v in ("spanish", "spa", "es", "español", "castellano"):
+            out.append("es")
+        elif v in ("english", "eng", "en"):
+            out.append("en")
+        elif v:
+            out.append(v[:12])
+    return sorted(set(out))
+
+
+def pick_ia_file(files: list[dict], max_bytes: int) -> dict | None:
+    candidates = []
+    for f in files:
+        name = f.get("name", "")
+        fmt = f.get("format", "")
+        lower = name.lower()
+        if not lower.endswith((".mp4", ".ogv", ".webm", ".m4v")):
+            continue
         try:
-            req = urllib.request.Request(url, headers=headers)
-            with urllib.request.urlopen(req, timeout=25) as response:
-                contenido = response.read().decode("utf-8", errors="ignore")
-                lineas = contenido.splitlines()
+            size = int(f.get("size", 0))
+        except (TypeError, ValueError):
+            size = 0
+        if size and size > max_bytes:
+            continue
+        priority = IA_FORMAT_PRIORITY.get(fmt, 4 if lower.endswith(".mp4") else 7)
+        candidates.append((priority, size or 10**12, f))
+    if not candidates:
+        return None
+    candidates.sort(key=lambda c: (c[0], c[1]))
+    return candidates[0][2]
 
-                i = 0
-                while i < len(lineas):
-                    linea = lineas[i].strip()
-                    if linea.startswith("#EXTINF:"):
-                        # Extraer carátula/logo si existe
-                        logo_match = re.search(r'tvg-logo="([^"]+)"', linea)
-                        logo = logo_match.group(1) if logo_match else None
 
-                        # Extraer categoría si existe
-                        group_match = re.search(r'group-title="([^"]+)"', linea)
-                        categoria = (
-                            group_match.group(1).lower()
-                            if group_match
-                            else "general"
-                        )
+def ia_collect(query: dict, cfg: dict) -> list[dict]:
+    items, page = [], 1
+    while len(items) < query.get("max_items", 100):
+        params = [("q", query["q"]), ("output", "json"), ("rows", query.get("rows", 100)), ("page", page),
+                  ("sort[]", "downloads desc")]
+        for field in ("identifier", "title", "description", "year", "language", "licenseurl",
+                      "downloads", "subject", "creator", "runtime"):
+            params.append(("fl[]", field))
+        data = get_json(f"{IA_SEARCH}?{urlencode(params)}")
+        docs = data.get("response", {}).get("docs", [])
+        if not docs:
+            break
+        items.extend(docs)
+        page += 1
+    return items[: query.get("max_items", 100)]
 
-                        # Extraer título
-                        titulo = (
-                            linea.split(",")[-1].strip()
-                            if "," in linea
-                            else "Sin Título"
-                        )
 
-                        # Buscar la URL del stream en la línea siguiente
-                        i += 1
-                        while i < len(lineas) and not lineas[i].strip():
-                            i += 1
+def ia_to_movie(doc: dict, cfg: dict) -> dict | None:
+    ident = doc.get("identifier")
+    lic_url = doc.get("licenseurl")
+    if not ident:
+        return None
+    if not lic_url and not cfg.get("allow_unlicensed"):
+        return None  # Archive no garantiza derechos: sin licencia declarada, no entra.
+    try:
+        meta = get_json(f"{IA_META}{quote(ident)}", retries=1, timeout=30)
+    except RuntimeError as exc:
+        print(f"[movies] {ident}: sin metadatos ({exc})")
+        return None
+    chosen = pick_ia_file(meta.get("files", []), cfg["max_file_bytes"])
+    if not chosen:
+        return None
+    ftype = "mp4" if chosen["name"].lower().endswith((".mp4", ".m4v")) else (
+        "webm" if chosen["name"].lower().endswith(".webm") else "ogv")
+    year = str(doc.get("year") or "")[:4]
+    subjects = [s.strip().lower() for s in as_list(doc.get("subject")) if isinstance(s, str)][:6]
+    desc = doc.get("description")
+    desc = " ".join(as_list(desc))[:600] if desc else ""
+    desc = re.sub(r"<[^>]+>", " ", desc)
+    return {
+        "id": f"ia-{slugify(ident)}",
+        "kind": "movie",
+        "title": " ".join(as_list(doc.get("title")))[:140] or ident,
+        "year": int(year) if year.isdigit() else None,
+        "languages": norm_language(doc.get("language")),
+        "genres": subjects,
+        "overview": desc,
+        "poster": f"https://archive.org/services/img/{quote(ident)}",
+        "popularity": int(doc.get("downloads") or 0),
+        "license": license_label(lic_url) or "Sin licencia declarada",
+        "license_url": lic_url,
+        "rights_note": "Licencia declarada por quien subió el ítem; Internet Archive no la garantiza.",
+        "origin": "Internet Archive",
+        "origin_url": f"https://archive.org/details/{quote(ident)}",
+        "sources": [{
+            "url": f"https://archive.org/download/{quote(ident)}/{quote(chosen['name'])}",
+            "type": ftype,
+            "quality": None,
+            "status": STATUS_UNCHECKED,
+            "reason": "Todavía no verificado",
+        }],
+    }
 
-                        if i < len(lineas):
-                            stream_url = lineas[i].strip()
-                            if stream_url.startswith("http"):
-                                ftype = (
-                                    "hls"
-                                    if ".m3u8" in stream_url
-                                    else "mp4"
-                                )
-                                item_id = f"m3u-{slugify(titulo[:40])}-{len(elementos)}"
 
-                                elementos.append({
-                                    "id": item_id,
-                                    "kind": "movie",
-                                    "title": titulo,
-                                    "year": None,
-                                    "languages": ["es"],
-                                    "genres": [categoria],
-                                    "overview": f"Categoría: {categoria}",
-                                    "poster": logo,
-                                    "popularity": 100,
-                                    "license": "Lista M3U personal",
-                                    "license_url": None,
-                                    "rights_note": "Fuente M3U directa provista por el usuario.",
-                                    "origin": "Listas M3U",
-                                    "origin_url": None,
-                                    "sources": [{
-                                        "url": stream_url,
-                                        "type": ftype,
-                                        "quality": "HD",
-                                        "status": STATUS_UNCHECKED,
-                                        "reason": "Pendiente de verificación",
-                                    }],
-                                })
-                    i += 1
-        except Exception as exc:
-            print(f"[m3u] Error al procesar la lista {url[:35]}: {exc}")
+def commons_collect(category: str) -> list[dict]:
+    params = {
+        "action": "query", "format": "json", "generator": "categorymembers",
+        "gcmtitle": category, "gcmtype": "file", "gcmlimit": "50",
+        "prop": "imageinfo", "iiprop": "url|mime|size|extmetadata",
+    }
+    data = get_json(f"{COMMONS_API}?{urlencode(params)}")
+    movies = []
+    for page in (data.get("query", {}).get("pages", {}) or {}).values():
+        info = (page.get("imageinfo") or [{}])[0]
+        mime = info.get("mime", "")
+        if mime not in ("video/webm", "video/ogg", "application/ogg"):
+            continue
+        ext = info.get("extmetadata", {})
+        lic = ext.get("LicenseShortName", {}).get("value")
+        if not lic:
+            continue
+        title = re.sub(r"^File:|\.[A-Za-z0-9]+$", "", page.get("title", ""))
+        movies.append({
+            "id": f"commons-{slugify(title)}",
+            "kind": "movie",
+            "title": title.replace("_", " "),
+            "year": None,
+            "languages": [],
+            "genres": [category.replace("Category:", "").replace("_", " ").lower()],
+            "overview": re.sub(r"<[^>]+>", "", ext.get("ImageDescription", {}).get("value", ""))[:600],
+            "poster": None,
+            "popularity": 0,
+            "license": lic,
+            "license_url": ext.get("LicenseUrl", {}).get("value"),
+            "rights_note": "Licencia tomada de los metadatos de Wikimedia Commons.",
+            "origin": "Wikimedia Commons",
+            "origin_url": info.get("descriptionurl"),
+            "sources": [{
+                "url": info["url"], "type": "webm" if mime == "video/webm" else "ogv",
+                "quality": f"{info.get('height')}p" if info.get("height") else None,
+                "status": STATUS_UNCHECKED, "reason": "Todavía no verificado",
+            }],
+        })
+    return movies
 
-    return elementos
+
+def _default_status(src: dict) -> str:
+    return STATUS_EXTERNAL if src.get("type") == "external" else STATUS_UNCHECKED
+
+
+def manual_entries(path: Path, kind: str) -> list[dict]:
+    try:
+        data = load_json(path, []) or []
+    except ValueError as exc:
+        print(f"[manual] {path} tiene JSON inválido y se ignora: {exc}")
+        return []
+    good = []
+    for entry in data:
+        if not isinstance(entry, dict) or not entry.get("rights"):
+            title = entry.get("title") if isinstance(entry, dict) else entry
+            print(f"[manual] '{title}' omitido: falta el campo 'rights' (de dónde sale el derecho a reproducirlo)")
+            continue
+        entry.setdefault("kind", kind)
+        entry.setdefault("id", f"manual-{slugify(entry.get('title', 'x'))}")
+        entry.setdefault("origin", "Manual")
+        entry.setdefault("license", entry["rights"])
+        all_sources = list(entry.get("sources", []))
+        for season in entry.get("seasons", []):
+            for ep in season.get("episodes", []):
+                all_sources.extend(ep.get("sources", []))
+        for src in all_sources:
+            src.setdefault("status", _default_status(src))
+            src.setdefault("reason", "Sitio externo: se abre fuera de la app" if src["status"] == STATUS_EXTERNAL
+                           else "Todavía no verificado")
+        good.append(entry)
+    return good
+
+
+# ---------------------------------------------------------------------------
+# Listas M3U propias (películas y series)
+# ---------------------------------------------------------------------------
+EPISODE_PATTERNS = [
+    re.compile(r"^(?P<title>.+?)[\s._-]+[Ss](?P<s>\d{1,2})[\s._-]*[Ee](?P<e>\d{1,3})\b(?P<rest>.*)$"),
+    re.compile(r"^(?P<title>.+?)[\s._-]+(?P<s>\d{1,2})x(?P<e>\d{1,3})\b(?P<rest>.*)$"),
+]
+SCHEMES_OK = ("http://", "https://")
+
+
+def guess_source_type(url: str) -> str:
+    path = url.lower().split("?", 1)[0]
+    if path.endswith((".mp4", ".m4v")):
+        return "mp4"
+    if path.endswith(".webm"):
+        return "webm"
+    if path.endswith((".ogv", ".ogg")):
+        return "ogv"
+    if path.endswith(".mkv"):
+        return "mkv"
+    return "hls"
+
+
+def split_episode(name: str):
+    """'Serie S01E02 - Título' -> ('Serie', 1, 2, 'Título'); si no parece episodio devuelve None."""
+    for pattern in EPISODE_PATTERNS:
+        m = pattern.match(name.strip())
+        if m:
+            rest = m.group("rest").strip(" -._")
+            return m.group("title").strip(" -._"), int(m.group("s")), int(m.group("e")), rest
+    return None
+
+
+def m3u_entries(cfg: dict) -> list[dict]:
+    """Descarga UNA lista M3U configurada y devuelve películas y series ya estructuradas.
+
+    cfg: {"url": ..., "rights": ..., "name": opcional, "max_items": opcional}
+    * Sin `rights` la lista se omite (queda escrito de dónde sale el derecho a reproducirla).
+    * Solo se aceptan enlaces http(s); magnet:, acestream:, rtmp: etc. se descartan (la app web no los reproduce).
+    * Todo nace como "unchecked": "ok" lo decide únicamente verify.py.
+    * Cualquier fallo (red, formato) devuelve lista vacía; nunca detiene el catálogo.
+    """
+    name = cfg.get("name") or cfg.get("url", "lista")
+    if not cfg.get("rights"):
+        print(f"[m3u] '{name}' omitida: falta 'rights' (de dónde sale el derecho a reproducirla)")
+        return []
+    if not str(cfg.get("url", "")).startswith(SCHEMES_OK):
+        print(f"[m3u] '{name}' omitida: la URL de la lista no es http(s)")
+        return []
+    try:
+        status, _, body, error = http_get(cfg["url"], timeout=30, max_bytes=30_000_000)
+        if status != 200:
+            print(f"[m3u] '{name}': no se pudo bajar ({error or f'HTTP {status}'})")
+            return []
+        entries = parse_m3u(body.decode("utf-8", "replace"))
+    except Exception as exc:  # noqa: BLE001 - una lista rota no debe frenar el resto
+        print(f"[m3u] '{name}': error inesperado ({type(exc).__name__}: {exc})")
+        return []
+
+    movies: list[dict] = []
+    series: dict[str, dict] = {}
+    skipped = 0
+    for e in entries[: int(cfg.get("max_items", 5000))]:
+        url = (e.get("url") or "").strip()
+        title = (e.get("name") or "").strip()
+        if not title or not url.startswith(SCHEMES_OK):
+            skipped += 1
+            continue
+        attrs = e.get("attrs", {})
+        genre = [attrs["group-title"].strip().lower()] if attrs.get("group-title") else []
+        source = {"url": url, "type": guess_source_type(url), "quality": None,
+                  "referrer": e.get("referrer"), "user_agent": e.get("user_agent"),
+                  "status": STATUS_UNCHECKED, "reason": "Todavía no verificado"}
+        base = {"genres": genre, "languages": [], "overview": "", "year": None,
+                "poster": attrs.get("tvg-logo") or None, "popularity": 0,
+                "license": cfg["rights"], "rights": cfg["rights"], "origin": name}
+        ep = split_episode(title)
+        if ep:
+            show, season_n, ep_n, ep_title = ep
+            sid = f"m3u-{slugify(show)}"
+            item = series.setdefault(sid, {**base, "id": sid, "kind": "series", "title": show, "seasons": []})
+            season = next((s for s in item["seasons"] if s["number"] == season_n), None)
+            if not season:
+                season = {"number": season_n, "episodes": []}
+                item["seasons"].append(season)
+            season["episodes"].append({"number": ep_n, "title": ep_title or f"Episodio {ep_n}", "sources": [source]})
+        else:
+            movies.append({**base, "id": f"m3u-{slugify(title)}", "kind": "movie", "title": title, "sources": [source]})
+    for item in series.values():
+        item["seasons"].sort(key=lambda s: s["number"])
+        for s in item["seasons"]:
+            s["episodes"].sort(key=lambda ep: ep["number"])
+    print(f"[m3u] '{name}': {len(movies)} películas, {len(series)} series, {skipped} entradas descartadas")
+    return movies + list(series.values())
+
+
+def dedupe(items: list[dict]) -> list[dict]:
+    """Si dos entradas comparten id, se conserva la primera (las manuales/curadas van antes)."""
+    seen, out = set(), []
+    for it in items:
+        if it["id"] in seen:
+            continue
+        seen.add(it["id"])
+        out.append(it)
+    return out
+
+
+def mark_fixture(items: list[dict]) -> None:
+    for it in items:
+        for src in it.get("sources", []):
+            src["status"] = STATUS_FIXTURE
+            src["reason"] = "Dato de prueba: no es un enlace real"
+        for season in it.get("seasons", []):
+            for ep in season.get("episodes", []):
+                for src in ep.get("sources", []):
+                    src["status"] = STATUS_FIXTURE
+                    src["reason"] = "Dato de prueba: no es un enlace real"
 
 
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", default="config.json")
     parser.add_argument("--out-dir", default="public/data")
-    parser.add_argument("--fixtures", help="no utilizado en modo M3U")
+    parser.add_argument("--fixtures", help="carpeta con movies.json y series.json de prueba (sin red)")
     args = parser.parse_args()
-
     out_dir = Path(args.out_dir)
 
-    print("[build_movies] Procesando listas M3U...")
-    movies = descargar_y_parsear_m3u(LISTAS_M3U)
-
-    # Cargar también manuales de data/manual/movies.json si querés sumar algo local a futuro
-    manual_path = Path("data/manual/movies.json")
-    if manual_path.exists():
-        try:
-            with open(manual_path, "r", encoding="utf-8") as f:
-                manual_data = json.load(f)
-                if isinstance(manual_data, list):
-                    for entry in manual_data:
-                        if isinstance(entry, dict) and entry.get("title"):
-                            movies.append(entry)
-        except Exception as exc:
-            print(f"[manual] Error al cargar {manual_path}: {exc}")
+    if args.fixtures:
+        movies = load_json(Path(args.fixtures) / "movies.json", [])
+        series = load_json(Path(args.fixtures) / "series.json", [])
+        mark_fixture(movies)
+        mark_fixture(series)
+        origin = "DATOS DE PRUEBA locales (data/fixtures)"
+    else:
+        cfg = {**DEFAULT_CONFIG, **(load_json(Path(args.config), {}) or {})}
+        movies, seen = [], set()
+        for q in cfg["ia_queries"]:
+            try:
+                docs = ia_collect(q, cfg)
+            except RuntimeError as exc:
+                print(f"[movies] consulta '{q['name']}' falló: {exc}")
+                continue
+            print(f"[movies] '{q['name']}': {len(docs)} resultados de búsqueda")
+            for doc in docs:
+                if doc.get("identifier") in seen:
+                    continue
+                seen.add(doc.get("identifier"))
+                try:
+                    movie = ia_to_movie(doc, cfg)
+                except Exception as exc:  # noqa: BLE001 - un ítem raro no debe frenar el catálogo
+                    print(f"[movies] {doc.get('identifier')}: ítem omitido por error inesperado ({type(exc).__name__}: {exc})")
+                    continue
+                if movie:
+                    movies.append(movie)
+        for cat in cfg.get("commons_categories", []):
+            try:
+                movies.extend(commons_collect(cat))
+            except RuntimeError as exc:
+                print(f"[movies] Commons '{cat}' falló: {exc}")
+        movies = manual_entries(Path("data/manual/movies.json"), "movie") + movies
+        series = manual_entries(Path("data/manual/series.json"), "series")
+        for lst in cfg.get("m3u_lists", []):
+            for item in m3u_entries(lst):
+                (series if item["kind"] == "series" else movies).append(item)
+        movies, series = dedupe(movies), dedupe(series)
+        origin = "Listas M3U propias + Internet Archive + Wikimedia Commons + entradas manuales"
 
     stamp = now_iso()
-    origin = "Listas M3U externas"
-
-    out_dir.mkdir(parents=True, exist_ok=True)
-    save_json(
-        out_dir / "movies.json",
-        {"generated": stamp, "origin": origin, "items": movies},
-    )
-    # Dejamos series preparado por compatibilidad
-    save_json(
-        out_dir / "series.json",
-        {"generated": stamp, "origin": origin, "items": []},
-    )
-
-    print(
-        f"[build_movies] ¡Listo! {len(movies)} elementos guardados en {out_dir / 'movies.json'}"
-    )
+    save_json(out_dir / "movies.json", {"generated": stamp, "origin": origin, "items": movies})
+    save_json(out_dir / "series.json", {"generated": stamp, "origin": origin, "items": series})
+    print(f"[movies] {len(movies)} películas, {len(series)} series -> {out_dir}")
     return 0
 
 
 if __name__ == "__main__":
     raise SystemExit(main())
-                              
+    
