@@ -244,10 +244,45 @@ class GuardTests(unittest.TestCase):
         write_catalog(".", [chan("A.mx", "MX", src())])
         self.assertEqual(self.run_guard(), 1)
 
-    def test_network_outage_is_detected_as_process_error(self):
+    def test_network_outage_skips_publication_without_failing_the_run(self):
         dead = [chan(f"C{i}.ar", "AR", src(status="dead", reason="Sin respuesta (URLError: timeout)")) for i in range(30)]
         write_catalog(".", dead)
-        self.assertEqual(self.run_guard(), 1)
+        out = Path("gh_output.txt")
+        with mock.patch.dict(os.environ, {"GITHUB_OUTPUT": str(out)}):
+            self.assertEqual(self.run_guard("--strict"), 0)          # verde...
+        self.assertIn("publish=false", out.read_text())             # ...pero NO se publica
+        rep = json.loads(Path("public/data/report.json").read_text())
+        self.assertFalse(rep["publish"])
+        self.assertTrue(rep["soft_failures"])
+
+    def test_api_error_skips_publication_without_failing_the_run(self):
+        d = Path("public/data")
+        d.mkdir(parents=True)
+        (d / "live.json").write_text(json.dumps({"origin": "iptv-org/api (SIN RESPUESTA)", "api_error": "timeout", "items": []}))
+        out = Path("gh_output.txt")
+        with mock.patch.dict(os.environ, {"GITHUB_OUTPUT": str(out)}):
+            self.assertEqual(self.run_guard("--strict"), 0)
+        self.assertIn("publish=false", out.read_text())
+
+    def test_healthy_catalog_sets_publish_true(self):
+        write_catalog(".", [chan("A.ar", "AR", src())])
+        out = Path("gh_output.txt")
+        with mock.patch.dict(os.environ, {"GITHUB_OUTPUT": str(out)}):
+            self.assertEqual(self.run_guard("--strict"), 0)
+        self.assertIn("publish=true", out.read_text())
+
+    def test_empty_live_without_api_error_is_still_a_hard_failure(self):
+        write_catalog(".", [])  # la API "respondió" pero vacía: no es un corte de red
+        self.assertEqual(self.run_guard("--strict"), 1)
+
+    def test_tests_never_emit_github_error_annotations(self):
+        import contextlib
+        import io
+        write_catalog(".", [])
+        buf = io.StringIO()
+        with mock.patch.dict(os.environ, {"GITHUB_ACTIONS": "true"}), contextlib.redirect_stdout(buf):
+            self.run_guard("--strict")
+        self.assertNotIn("::error", buf.getvalue())
 
     def test_all_checked_but_none_ok_fails(self):
         dead = [chan(f"C{i}.ar", "AR", src(status="dead", reason="HTTP 404")) for i in range(25)]
@@ -372,4 +407,4 @@ class HygieneTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-        
+      
