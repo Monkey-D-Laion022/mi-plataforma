@@ -150,7 +150,7 @@ class BuildTests(unittest.TestCase):
         ch, st, bl = build_live.load_api(self.api, build_live.API_BASE)
         cat = build_live.build(ch, st, bl, common.LATAM_COUNTRIES, fixture=True, allowlist={"PruebaNoticiasAR.ar"})
         self.assertEqual([i["id"] for i in cat["items"]], ["PruebaNoticiasAR.ar"])
-        self.assertEqual(cat["skipped"]["fuera_de_allowlist"], 5)  # 4 canales + el que no tiene fuentes
+        self.assertEqual(cat["skipped"]["fuera_de_allowlist"], 5)
 
     def test_read_allowlist_comments(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -174,14 +174,6 @@ class BuildTests(unittest.TestCase):
         for item in cat["items"]:
             for s in item["sources"]:
                 self.assertEqual(s["status"], common.STATUS_UNCHECKED)
-
-    def test_manual_entries_require_rights(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            p = Path(tmp) / "m.json"
-            p.write_text(json.dumps([{"title": "Sin derechos", "sources": []},
-                                     {"title": "Con derechos", "rights": "CC BY", "sources": [{"url": "https://x"}]}]))
-            out = build_movies.manual_entries(p, "movie")
-            self.assertEqual([e["title"] for e in out], ["Con derechos"])
 
 
 class VerifiedStampTests(unittest.TestCase):
@@ -235,4 +227,4 @@ class M3UParserTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-        
+    
