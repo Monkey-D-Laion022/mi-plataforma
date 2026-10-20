@@ -18,6 +18,7 @@ Uso:
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 from pathlib import Path
 
@@ -131,7 +132,17 @@ def main() -> int:
 
     countries = [c.strip().upper() for c in args.countries.split(",") if c.strip()]
     fixtures_dir = Path(args.fixtures) if args.fixtures else None
-    channels, streams, blocklist = load_api(fixtures_dir, args.api_base)
+    try:
+        channels, streams, blocklist = load_api(fixtures_dir, args.api_base)
+    except RuntimeError as exc:
+        # La API de iptv-org no respondió (corte temporal, bloqueo, DNS...). No es un error de tu proyecto:
+        # se deja un catálogo vacío marcado con api_error y guard.py decide NO publicar esta vez.
+        print(f"::warning::{exc}" if os.environ.get("GITHUB_ACTIONS") == "true" and "unittest" not in sys.modules
+              else f"[live] AVISO: {exc}")
+        save_json(Path(args.out), {"generated": now_iso(), "origin": "iptv-org/api (SIN RESPUESTA)",
+                                   "api_error": str(exc)[:300], "skipped": {}, "items": []})
+        print(f"[live] catálogo vacío escrito en {args.out} (api_error). Se omitirá la publicación.")
+        return 0
     allow = read_allowlist(Path(args.allowlist))
     if allow:
         print(f"[live] modo allowlist: solo {len(allow)} canales autorizados por vos")
@@ -144,3 +155,4 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+        
